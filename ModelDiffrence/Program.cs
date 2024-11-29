@@ -1,74 +1,69 @@
-﻿using System.Reflection;
+﻿namespace ModelDiffrence;
 
-namespace ModelDiffrence
+internal class Program
 {
-    public class Program
-	{
-        public static void Main()
+    static int Main(string[] args)
+    {
+        var model1 = new User
         {
-            var userSendData = new Person
-            {
-                Name        = "Mevlut Can",
-                Surname     = "Turacı",
-                Age         = 21,
-                Email       = "example@example.com"
-            };
+            Name            = "Mevlut Can",
+            Surname         = "Turaci",
+            Age             = 20,
+            Job             = "Developer",
+            Sallary         = 10,
+            UpdatedTime     = DateTime.Now,
+        };
 
-            var databaseInData = new Person
-            {
-                Name = "Mevlüt",
-                Surname = "Can",
-                Age = 19,
-                Email = "example@example.com"
-            };
-
-            var diffrencedModel = CompareAndReturnUpdatedModel<Person>(databaseInData, userSendData);
-            Console.WriteLine($@"
-Name:    {databaseInData.Name} to {diffrencedModel.Name}
-Surname: {databaseInData.Surname} to {diffrencedModel.Surname}
-Age:     {databaseInData.Age} to {diffrencedModel.Age}
-Email:   {databaseInData.Email} to {diffrencedModel.Email}
-            ");
-
-            Console.Read();
-        }
-
-
-        #region Diffrence Function
-
-        public static T CompareAndReturnUpdatedModel<T>(T model1, T model2) where T : class
+        var model2 = new User
         {
-            T updatedModel = (T)Activator.CreateInstance(typeof(T));
+            Name            = "Mevlut Can",
+            Surname         = "Turaci",
+            Age             = 20,
+            Job             = "Developer 1",
+            Sallary         = 10,
+            UpdatedTime     = DateTime.Now.AddMilliseconds(Random.Shared.Next(2500, 999990)),
+        };
 
-            Type type = typeof(T);
-            PropertyInfo[] properties = type.GetProperties();
+        //var isChanged = Usege_1(model1, model2);
+        var isChanged = Usege_2(model1, model2);
 
-            foreach (var property in properties)
-            {
-                object value1 = property.GetValue(model1);
-                object value2 = property.GetValue(model2);
-
-                if (!object.Equals(value1, value2))
-                {
-                    property.SetValue(updatedModel, value2);
-                }
-                else
-                {
-                    property.SetValue(updatedModel, null);
-                }
-            }
-
-            return updatedModel;
-        }
-
-        #endregion
+        Console.WriteLine("Model is changed: {0}", isChanged);
+        
+        return 1;
     }
 
-    public class Person
-	{
-        public string? Name { get; set; }
-        public string? Surname { get; set; }
-        public string? Email { get; set; }
-        public int? Age { get; set; }
+    public static bool Usege_1<T>(T model1, T model2)
+    {
+        var excludedColumns = ModelDiffHelper.GetExcludedColumns<User>(p => new
+        {
+            p.UpdatedTime
+        });
+
+        var includedColumns = ModelDiffHelper.GetIncludedColumns<User>(p => new
+        {
+            p.Name,
+            p.Surname
+        });
+        return ModelDiffHelper.AreModelsDifferent(model1, model2, excludedProperties: excludedColumns, includedProperties: includedColumns);        
     }
+
+    public static bool Usege_2<T>(T model1, T model2)
+    {
+        var excludedColumns = ModelDiffHelper.GetExcludedColumns<User>(p => new
+        {
+            p.UpdatedTime
+        });
+
+        return ModelDiffHelper.AreModelsDifferent(model1, model2, excludedProperties: excludedColumns);
+    }
+}
+
+public class User
+{
+    public string Name { get; set; } = null!;
+    public string Surname { get; set; } = null!;
+    public int Age { get; set; }
+    public string Job { get; set; } = null!;
+    public decimal Sallary { get; set; }
+    public DateTime UpdatedTime { get; set; }
 }
