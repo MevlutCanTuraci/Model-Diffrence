@@ -1,4 +1,6 @@
-﻿namespace ModelDiffrence;
+﻿using ModelDiffrence.Models;
+namespace ModelDiffrence;
+
 
 internal class Program
 {
@@ -7,7 +9,7 @@ internal class Program
         var model1 = new User
         {
             Name            = "Mevlut Can",
-            Surname         = "Turaci",
+            Surname         = "Turacı",
             Age             = 20,
             Job             = "Developer",
             Sallary         = 10,
@@ -25,9 +27,16 @@ internal class Program
         };
 
         //var isChanged = Usege_1(model1, model2);
-        var isChanged = Usege_2(model1, model2);
+        //var isChanged = Usege_2(model1, model2);
 
-        Console.WriteLine("Model is changed: {0}", isChanged);
+        var isChanged = Usege_3ReturnedFileds(model1, model2);
+
+        Console.WriteLine("Model is changed: {0}", isChanged.IsChanged);
+        Console.WriteLine("Changed fields:");
+        foreach (var item in isChanged.ChangedFields)
+        {
+            Console.WriteLine("- {0}", item.Name);
+        }
         
         return 1;
     }
@@ -55,6 +64,16 @@ internal class Program
         });
 
         return ModelDiffHelper.AreModelsDifferent(model1, model2, excludedProperties: excludedColumns);
+    }
+
+    public static DiffResult Usege_3ReturnedFileds<T>(T model1, T model2)
+    {
+        var excludedColumns = ModelDiffHelper.GetExcludedColumns<User>(p => new
+        {
+            p.UpdatedTime
+        });
+
+        return ModelDiffHelper.GetModelDifferences(model1, model2, excludedProperties: excludedColumns);
     }
 }
 

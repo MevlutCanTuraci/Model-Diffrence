@@ -1,4 +1,5 @@
-﻿using System.Linq.Expressions;
+﻿using ModelDiffrence.Models;
+using System.Linq.Expressions;
 namespace ModelDiffrence;
 
 public static class ModelDiffHelper
@@ -96,6 +97,49 @@ public static class ModelDiffHelper
     )
     {
         return AreModelsDifferent<T>(model1, model2, excludedProperties?.ToArray(), includedProperties?.ToArray());
+    }
+
+    public static DiffResult GetModelDifferences<T>(
+        T model1,
+        T model2,
+        IEnumerable<string>? excludedProperties = null,
+        IEnumerable<string>? includedProperties = null
+    )
+    {
+        if (model1 == null || model2 == null)
+        {
+            throw new ArgumentNullException("Model değerlerinden biri null olamaz.");
+        }
+
+        var properties = typeof(T).GetProperties().Where(p => p.CanRead);
+
+        // Haric tutulanlar
+        if (excludedProperties != null)
+        {
+            properties = properties.Where(p => !excludedProperties.Any(s => s.Equals(p.Name, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        // Dahil edilecek özellikler
+        if (includedProperties != null)
+        {
+            properties = properties.Where(p => includedProperties.Any(s => s.Equals(p.Name, StringComparison.OrdinalIgnoreCase)));
+        }
+
+        var result = new DiffResult();
+
+        foreach (var property in properties)
+        {
+            var value1 = property.GetValue(model1);
+            var value2 = property.GetValue(model2);
+
+            if (!object.Equals(value1, value2))
+            {
+                result.IsChanged = true;
+                result.ChangedFields.Add(new ChangedField { Name = property.Name });
+            }
+        }
+
+        return result;
     }
 
     // Property adlarını lambda ifadesinden çıkaran metot
