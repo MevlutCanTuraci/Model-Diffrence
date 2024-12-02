@@ -1,5 +1,8 @@
-﻿using ModelDiffrence.Models;
+﻿using System.Collections;
+using ModelDiffrence.Models;
 using System.Linq.Expressions;
+using System.Reflection;
+
 namespace ModelDiffrence;
 
 public static class ModelDiffHelper
@@ -135,7 +138,7 @@ public static class ModelDiffHelper
             if (!object.Equals(value1, value2))
             {
                 result.IsChanged = true;
-                result.ChangedFields.Add(new ChangedField { Name = property.Name });
+                result.Changes.Add(new ChangedField { Name = property.Name });
             }
         }
 
@@ -156,5 +159,98 @@ public static class ModelDiffHelper
     public static IEnumerable<string> GetIncludedColumns<T>(Expression<Func<T, object>> propertiesSelector)
     {
         return GetExcludedColumns<T>(propertiesSelector);
+    }
+    
+        ///////////////////////////////////
+
+    public static DiffResult CompareObjects(object oldObj, object newObj, string parentName = "")
+    {
+        var result = new DiffResult();
+        if (oldObj == null || newObj == null)
+        {
+            result.IsChanged = oldObj != newObj;
+            return result;
+        }
+
+        var type = oldObj.GetType();
+
+        // Property'leri iterate et
+        foreach (var property in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+        {
+            var oldValue = property.GetValue(oldObj);
+            var newValue = property.GetValue(newObj);
+
+            // Parent bilgisini oluştur
+            var fullName = string.IsNullOrEmpty(parentName) ? property.Name : $"{parentName}.{property.Name}";
+
+            if (IsSimpleType(property.PropertyType))
+            {
+                // Basit türleri kıyasla
+                if (!Equals(oldValue, newValue))
+                {
+                    result.IsChanged = true;
+                    result.Changes.Add(new ChangedField
+                    {
+                        Path = fullName,         // Tam yol
+                        Name = property.Name,    // Alan adı
+                        Parent = (string.IsNullOrEmpty(parentName?.Trim())) ? null : parentName,     // Üst nesne
+                        Index = null             // Basit türlerde Index yok
+                    });
+                }
+            }
+            else if (typeof(IEnumerable).IsAssignableFrom(property.PropertyType) && property.PropertyType != typeof(string))
+            {
+                // Koleksiyonları kontrol et
+                CompareCollections(result, (IEnumerable)oldValue, (IEnumerable)newValue, fullName, property.Name);
+            }
+            else
+            {
+                // Kompleks nesneler için rekürsif çağrı
+                var nestedResult = CompareObjects(oldValue, newValue, fullName);
+                if (nestedResult.IsChanged)
+                {
+                    result.IsChanged = true;
+                    result.Changes.AddRange(nestedResult.Changes);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private static void CompareCollections(DiffResult result, IEnumerable oldCollection, IEnumerable newCollection, string parentName, string propertyName)
+    {
+        var oldList = oldCollection?.Cast<object>().ToList() ?? new List<object>();
+        var newList = newCollection?.Cast<object>().ToList() ?? new List<object>();
+
+        var maxCount = Math.Max(oldList.Count, newList.Count);
+        for (int i = 0; i < maxCount; i++)
+        {
+            var oldItem = i < oldList.Count ? oldList[i] : null;
+            var newItem = i < newList.Count ? newList[i] : null;
+            var fullName = $"{parentName}[{i}]";
+
+            var nestedResult = CompareObjects(oldItem, newItem, fullName);
+            if (nestedResult.IsChanged)
+            {
+                result.IsChanged = true;
+                foreach (var change in nestedResult.Changes)
+                {
+                    // Koleksiyon elemanları için Index bilgisi ekle
+                    result.Changes.Add(new ChangedField
+                    {
+                        Path = change.Path,
+                        Name = change.Name,
+                        Parent = propertyName,
+                        Index = i
+                    });
+                }
+            }
+        }
+    }
+
+    private static bool IsSimpleType(Type type)
+    {
+        return type.IsPrimitive || type.IsEnum || type == typeof(string) || type == typeof(decimal) || type == typeof(DateTime);
     }
 }

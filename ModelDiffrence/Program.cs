@@ -33,7 +33,7 @@ internal class Program
 
         Console.WriteLine("Model is changed: {0}", isChanged.IsChanged);
         Console.WriteLine("Changed fields:");
-        foreach (var item in isChanged.ChangedFields)
+        foreach (var item in isChanged.Changes)
         {
             Console.WriteLine("- {0}", item.Name);
         }
